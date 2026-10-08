@@ -56,7 +56,7 @@ await Rejected<RecordNotFoundException>(() => service.SaveDriver(1, "admin", cre
 Check(!typeof(Vehicle).Assembly.GetReferencedAssemblies().Any(x => x.Name!.Contains("EntityFramework") || x.Name.Contains("AspNetCore")), "Domain independente de EF e ASP.NET");
 Check(!typeof(FleetService).Assembly.GetReferencedAssemblies().Any(x => x.Name!.Contains("Infrastructure") || x.Name.Contains("EntityFramework")), "Application independente da persistência");
 var schemaPath = Path.Combine(AppContext.BaseDirectory, "schema-v0.1.sql");
-Check(script.Replace("\r\n", "\n") == File.ReadAllText(schemaPath).Replace("\r\n", "\n"), "Esquema SQL compatível com v0.1");
+Check(script.Replace("\r\n", "\n").TrimEnd() == File.ReadAllText(schemaPath).Replace("\r\n", "\n").TrimEnd(), "Esquema SQL compatível com v0.1");
 Console.WriteLine($"{checks} verificações de regras e arquitetura passaram.");
 
 sealed class TestFleetStore : IFleetStore

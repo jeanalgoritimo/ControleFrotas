@@ -61,5 +61,3 @@ GO
 
 CREATE UNIQUE INDEX [IX_Vehicles_CompanyId_Plate] ON [Vehicles] ([CompanyId], [Plate]);
 GO
-
-
