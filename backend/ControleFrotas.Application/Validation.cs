@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 namespace ControleFrotas;
+
 public static class Validation
 {
     public static string Plate(string? value) => (value ?? "").Trim().Replace("-", "").ToUpperInvariant();

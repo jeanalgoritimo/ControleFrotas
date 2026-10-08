@@ -1,0 +1,10 @@
+using ControleFrotas;
+var builder = WebApplication.CreateBuilder(args);
+builder.AddFleetServices();
+var app = builder.Build();
+await app.InitializeFleetDatabase();
+app.UseFleetPipeline();
+app.MapAuthEndpoints();
+app.MapFleetEndpoints();
+app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
+app.Run();

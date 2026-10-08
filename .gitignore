@@ -6,3 +6,6 @@
 .vs/
 *.user
 backend/appsettings.Development.json
+
+**/appsettings.Development.json
+frontend/node_modules

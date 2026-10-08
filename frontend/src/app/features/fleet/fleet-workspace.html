@@ -1,0 +1,306 @@
+<section class="panel">
+  <div class="toolbar">
+    <input
+      class="form-control search"
+      aria-label="Pesquisar cadastros"
+      [placeholder]="tab() === 'vehicles' ? 'Buscar placa, marca ou modelo' : 'Buscar nome do motorista'"
+      [ngModel]="query()"
+      (ngModelChange)="query.set($event); page.set(1)"
+    /><label class="form-check"
+      ><input
+        class="form-check-input"
+        type="checkbox"
+        [ngModel]="onlyActive()"
+        (ngModelChange)="onlyActive.set($event); page.set(1)"
+      />
+      Somente ativos</label
+    ><button
+      class="btn btn-primary"
+      (click)="tab() === 'vehicles' ? openVehicle() : openDriver()"
+    >
+      {{tab() === 'vehicles' ? '+ Novo veículo' : '+ Novo motorista'}}
+    </button>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          @if (tab() === 'vehicles') {
+          <th>Veículo</th>
+          <th>Categoria</th>
+          <th>Ano</th>
+          <th>Hodômetro</th>
+          } @else {
+          <th>Motorista</th>
+          <th>Categoria CNH</th>
+          <th>Validade</th>
+          <th>Situação CNH</th>
+          }
+          <th>Cadastro</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (tab() === 'vehicles') { @for (v of
+        vehicleRows().slice((page()-1)*10,page()*10); track v.id) {
+        <tr>
+          <td>
+            <strong>{{v.plate}}</strong
+            ><small class="d-block text-secondary"
+              >{{v.brand}} {{v.model}}</small
+            >
+          </td>
+          <td>{{v.category}}</td>
+          <td>{{v.year}}</td>
+          <td>{{number(v.odometer)}} km</td>
+          <td>
+            <span class="status" [class.inactive]="!v.active"
+              >{{v.active ? 'Ativo' : 'Inativo'}}</span
+            >
+          </td>
+          <td>
+            <button
+              class="btn btn-outline-primary btn-sm"
+              (click)="openVehicle(v)"
+            >
+              Editar
+            </button>
+          </td>
+        </tr>
+        } } @else { @for (d of driverRows().slice((page()-1)*10,page()*10);
+        track d.id) {
+        <tr>
+          <td><strong>{{d.name}}</strong></td>
+          <td>{{d.licenseCategory}}</td>
+          <td>{{d.licenseExpiry | date:'dd/MM/yyyy'}}</td>
+          <td>
+            <span class="status" [class.inactive]="expired(d)"
+              >{{expired(d) ? 'Vencida' : 'Dentro da validade'}}</span
+            >
+          </td>
+          <td>{{d.active ? 'Ativo' : 'Inativo'}}</td>
+          <td>
+            <button
+              class="btn btn-outline-primary btn-sm"
+              (click)="openDriver(d)"
+            >
+              Editar
+            </button>
+          </td>
+        </tr>
+        } } @if (rowsCount() === 0) {
+        <tr>
+          <td colspan="6" class="empty">Nenhum cadastro encontrado.</td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <footer class="table-footer">
+    <span>{{rowsCount()}} registros · Página {{page()}} de {{pages()}}</span>
+    <div>
+      <button
+        class="btn btn-outline-secondary btn-sm me-2"
+        [disabled]="page() <= 1"
+        (click)="page.set(page()-1)"
+      >
+        Anterior</button
+      ><button
+        class="btn btn-outline-secondary btn-sm"
+        [disabled]="page() >= pages()"
+        (click)="page.set(page()+1)"
+      >
+        Próxima
+      </button>
+    </div>
+  </footer>
+</section>
+<dialog #editor (cancel)="saving() ? $event.preventDefault() : null">
+  <form (ngSubmit)="save()">
+    <div class="modal-heading">
+      <div>
+        <p class="eyebrow">CADASTRO DA FROTA</p>
+        <h2 id="fleet-editor-title">
+          {{kind === 'vehicle' ? (vehicle.id ? 'Editar veículo' : 'Novo
+          veículo') : (driver.id ? 'Editar motorista' : 'Novo motorista')}}
+        </h2>
+      </div>
+      <button
+        type="button"
+        class="btn-close"
+        aria-label="Fechar"
+        [disabled]="saving()"
+        (click)="closeEditor()"
+      ></button>
+    </div>
+    @if (modalError()) {
+    <div class="alert alert-danger" role="alert">{{modalError()}}</div>
+    }
+    <div class="form-grid">
+      @if (kind === 'vehicle') {
+      <div>
+        <label for="plate" class="form-label">Placa</label
+        ><input
+          id="plate"
+          name="plate"
+          class="form-control"
+          [(ngModel)]="vehicle.plate"
+          maxlength="8"
+          placeholder="ABC1D23"
+          required
+        />
+      </div>
+      <div>
+        <label for="category" class="form-label">Categoria</label
+        ><select
+          id="category"
+          name="category"
+          class="form-select"
+          [(ngModel)]="vehicle.category"
+        >
+          @for (c of ['Carro','Moto','Van','Utilitário']; track c) {
+          <option>{{c}}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label for="brand" class="form-label">Marca</label
+        ><input
+          id="brand"
+          name="brand"
+          class="form-control"
+          [(ngModel)]="vehicle.brand"
+          maxlength="80"
+          required
+        />
+      </div>
+      <div>
+        <label for="model" class="form-label">Modelo</label
+        ><input
+          id="model"
+          name="model"
+          class="form-control"
+          [(ngModel)]="vehicle.model"
+          maxlength="100"
+          required
+        />
+      </div>
+      <div>
+        <label for="year" class="form-label">Ano de fabricação</label
+        ><input
+          id="year"
+          name="year"
+          type="number"
+          class="form-control"
+          [(ngModel)]="vehicle.year"
+          min="1900"
+          required
+        />
+      </div>
+      <div>
+        <label for="odometer" class="form-label">Hodômetro (km)</label
+        ><input
+          id="odometer"
+          name="odometer"
+          type="number"
+          class="form-control"
+          [(ngModel)]="vehicle.odometer"
+          min="0"
+          step="0.001"
+          required
+        />
+      </div>
+      <label class="form-check"
+        ><input
+          type="checkbox"
+          name="vehicleActive"
+          class="form-check-input"
+          [(ngModel)]="vehicle.active"
+        />
+        Cadastro ativo</label
+      >
+      } @else {
+      <div class="full">
+        <label for="name" class="form-label">Nome</label
+        ><input
+          id="name"
+          name="name"
+          class="form-control"
+          [(ngModel)]="driver.name"
+          maxlength="150"
+          required
+        />
+      </div>
+      <div>
+        <label for="cpf" class="form-label">CPF — somente números</label
+        ><input
+          id="cpf"
+          name="cpf"
+          class="form-control"
+          [(ngModel)]="driver.cpf"
+          maxlength="11"
+          inputmode="numeric"
+          required
+        />
+      </div>
+      <div>
+        <label for="license" class="form-label">CNH — somente números</label
+        ><input
+          id="license"
+          name="license"
+          class="form-control"
+          [(ngModel)]="driver.license"
+          maxlength="11"
+          inputmode="numeric"
+          required
+        />
+      </div>
+      <div>
+        <label for="licenseCategory" class="form-label">Categoria da CNH</label
+        ><select
+          id="licenseCategory"
+          name="licenseCategory"
+          class="form-select"
+          [(ngModel)]="driver.licenseCategory"
+        >
+          @for (c of ['A','B','C','D','E','AB','AC','AD','AE']; track c) {
+          <option>{{c}}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label for="expiry" class="form-label">Validade da CNH</label
+        ><input
+          id="expiry"
+          name="expiry"
+          type="date"
+          class="form-control"
+          [(ngModel)]="driver.licenseExpiry"
+          required
+        />
+      </div>
+      <label class="form-check"
+        ><input
+          type="checkbox"
+          name="driverActive"
+          class="form-check-input"
+          [(ngModel)]="driver.active"
+        />
+        Cadastro ativo</label
+      >
+      }
+    </div>
+    <div class="modal-actions">
+      <button
+        type="button"
+        class="btn btn-outline-secondary"
+        (click)="closeEditor()"
+        [disabled]="saving()"
+      >
+        Cancelar</button
+      ><button class="btn btn-primary" [disabled]="saving()">
+        {{saving() ? 'Salvando…' : 'Salvar'}}
+      </button>
+    </div>
+  </form>
+</dialog>

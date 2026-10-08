@@ -1,0 +1,29 @@
+<section class="metrics" aria-label="Indicadores cadastrais">
+  <article>
+    <span>Veículos cadastrados</span><strong>{{vehicleCount()}}</strong
+    ><small>Total de veículos cadastrados</small>
+  </article>
+  <article>
+    <span>Motoristas cadastrados</span><strong>{{driverCount()}}</strong
+    ><small>Consulte a validade da CNH no cadastro</small>
+  </article>
+  <article>
+    <span>Histórico</span><strong>{{auditCount()}}</strong
+    ><small>Até 100 alterações recentes</small>
+  </article>
+</section>
+<section class="panel welcome">
+  <h2>Comece pelo cadastro da frota</h2>
+  <p>
+    Cadastre os veículos e os motoristas. Abastecimentos, viagens e manutenção
+    serão adicionados nos próximos ciclos.
+  </p>
+  <button class="btn btn-primary" (click)="navigate.emit('vehicles')">
+    Ver veículos</button
+  ><button
+    class="btn btn-outline-primary ms-2"
+    (click)="navigate.emit('drivers')"
+  >
+    Ver motoristas
+  </button>
+</section>
