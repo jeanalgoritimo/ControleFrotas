@@ -16,7 +16,7 @@ Instale o SDK .NET 10, Node.js compatível com Angular 21 (Node 24 LTS recomenda
 ## 1. Extrair e configurar o SQL Server
 Extraia o ZIP para `C:\Projetos`, resultando em `C:\Projetos\ControleFrotas`.
 
-A conexão padrão em `backend/appsettings.json` usa `.\SQLEXPRESS` e autenticação Windows. Se sua instância for diferente, altere somente o servidor. Exemplo: `DESKTOP-F05RB99\SQLEXPRESS` (no JSON, escreva `DESKTOP-F05RB99\\SQLEXPRESS`).
+A conexão padrão em `backend/ControleFrotas.Api/appsettings.json` usa `.\SQLEXPRESS` e autenticação Windows. Se sua instância for diferente, altere somente o servidor. Exemplo: `DESKTOP-F05RB99\SQLEXPRESS` (no JSON, escreva `DESKTOP-F05RB99\\SQLEXPRESS`).
 
 A API cria um banco novo chamado **ControleFrotas** na primeira execução. Seu usuário Windows precisa ter permissão para criá-lo. Não configure a conexão para o banco do estoque ou o banco legado. Esta versão usa `EnsureCreated` para inicialização; a evolução do esquema exigirá migrações antes de novas versões.
 
@@ -42,7 +42,7 @@ Se houver falha de download no npm, tente `npm ci --maxsockets=1 --fetch-retries
 ## 4. Verificar o código
 ```powershell
 cd C:\Projetos\ControleFrotas
-dotnet build .\backend\ControleFrotas.Api.csproj
+dotnet build .\backend\ControleFrotas.slnx
 dotnet run --project .\tests\ControleFrotas.Checks.csproj
 cd frontend
 npm run build
@@ -66,3 +66,22 @@ Ainda não estão implementados: gestão de empresas/unidades, outros usuários/
 Os indicadores são contagens reais dos cadastros; disponibilidade e custo/km ainda não são calculados. O frontend busca os registros e pagina localmente; paginação no servidor será necessária com maior volume.
 
 Uso local para avaliação. Publicação requer HTTPS, configuração adequada de cookie Secure, conexão protegida e migrações versionadas. Nenhum certificado, credencial ou banco do legado é incluído.
+
+## Arquitetura
+
+A solução segue a separação usada na Gestão de Estoque:
+
+| Projeto | Responsabilidade |
+|---|---|
+| ControleFrotas.Domain | Entidades, sem EF ou ASP.NET |
+| ControleFrotas.Application | Contratos, validações e casos de uso |
+| ControleFrotas.Infrastructure | SQL Server, EF e transações com auditoria |
+| ControleFrotas.Api | HTTP, autenticação, CSRF e composição |
+
+Application depende de Domain; Infrastructure implementa IFleetStore da Application. API compõe os serviços. O frontend centraliza HTTP em core e contratos por funcionalidade em features. Login, visão geral, histórico e cadastros ficam em componentes por funcionalidade; App coordena sessão e carregamento.
+
+As rotas, cookies, tabelas, índices e rowversion permanecem compatíveis com v0.1. Não apague o banco. EnsureCreated continua nesta refatoração; a introdução de migrations exige baseline do banco existente antes de alterações de esquema.
+
+Execute `dotnet build backend/ControleFrotas.slnx` para validar todos os projetos. O GitHub Actions verifica backend, regras e build Angular. Sonar não está configurado: não há declaração de aprovação no Sonar.
+
+GET `/api/health` confirma que a API está iniciada (não é uma verificação de conectividade do banco).

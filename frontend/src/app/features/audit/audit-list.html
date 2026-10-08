@@ -1,0 +1,28 @@
+<section class="panel">
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Data local</th>
+          <th>Ação</th>
+          <th>Registro</th>
+          <th>Responsável</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (a of audits(); track a.id) {
+        <tr>
+          <td>{{a.atUtc | date:'dd/MM/yyyy HH:mm'}}</td>
+          <td>{{a.action}}</td>
+          <td>#{{a.recordId}}</td>
+          <td>{{a.actor}}</td>
+        </tr>
+        } @empty {
+        <tr>
+          <td colspan="4" class="empty">Nenhuma alteração registrada.</td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>

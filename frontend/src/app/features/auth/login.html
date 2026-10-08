@@ -1,0 +1,36 @@
+<main class="login-shell">
+  <section class="login-card">
+    <div class="brand-mark">CF</div>
+    <p class="eyebrow">GESTÃO OPERACIONAL</p>
+    <h1>Controle de Frotas</h1>
+    <p class="text-secondary">Acesse sua frota com segurança.</p>
+    @if (error()) {
+    <div class="alert alert-danger" role="alert">{{error()}}</div>
+    }
+    <form (ngSubmit)="submit()">
+      <label for="username" class="form-label">Usuário</label
+      ><input
+        id="username"
+        name="username"
+        class="form-control mb-3"
+        [(ngModel)]="username"
+        required
+        maxlength="100"
+        autocomplete="username"
+      />
+      <label for="password" class="form-label">Senha</label
+      ><input
+        id="password"
+        name="password"
+        class="form-control mb-4"
+        type="password"
+        [(ngModel)]="password"
+        required
+        autocomplete="current-password"
+      />
+      <button class="btn btn-primary w-100" [disabled]="loading()">
+        {{loading() ? 'Entrando…' : 'Entrar'}}
+      </button>
+    </form>
+  </section>
+</main>

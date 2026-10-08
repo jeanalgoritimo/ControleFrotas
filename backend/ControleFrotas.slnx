@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="ControleFrotas.Api/ControleFrotas.Api.csproj" />
+  <Project Path="ControleFrotas.Application/ControleFrotas.Application.csproj" />
+  <Project Path="ControleFrotas.Domain/ControleFrotas.Domain.csproj" />
+  <Project Path="ControleFrotas.Infrastructure/ControleFrotas.Infrastructure.csproj" />
+</Solution>
