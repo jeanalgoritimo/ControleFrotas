@@ -30,6 +30,25 @@ export class App {
   drivers = signal<Driver[]>([]);
   audits = signal<Audit[]>([]);
   tab = signal("overview");
+  menuCollapsed = signal(this.readMenuPreference());
+  toggleMenu() {
+    this.menuCollapsed.update((value) => !value);
+    try {
+      localStorage.setItem(
+        "ControleFrotas.menuCollapsed",
+        String(this.menuCollapsed()),
+      );
+    } catch {
+      /* O menu continua funcionando quando o armazenamento está indisponível. */
+    }
+  }
+  private readMenuPreference(): boolean {
+    try {
+      return localStorage.getItem("ControleFrotas.menuCollapsed") === "true";
+    } catch {
+      return false;
+    }
+  }
   api = inject(ApiClient);
   constructor() {
     void this.restore();

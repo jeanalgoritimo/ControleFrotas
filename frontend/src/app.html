@@ -5,8 +5,32 @@
   (credentials)="login($event)"
 />
 } @else {
-<div class="app-shell">
-  <aside>
+<div class="app-shell" [class.menu-collapsed]="menuCollapsed()">
+  <button
+    type="button"
+    class="menu-toggle btn btn-light"
+    [attr.aria-label]="menuCollapsed() ? 'Expandir menu' : 'Recolher menu'"
+    [attr.title]="menuCollapsed() ? 'Expandir menu' : 'Recolher menu'"
+    [attr.aria-expanded]="!menuCollapsed()"
+    aria-controls="main-sidebar"
+    (click)="toggleMenu()"
+  >
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M4 5h16M4 12h16M4 19h16" />
+    </svg>
+  </button>
+  <aside id="main-sidebar" [hidden]="menuCollapsed()">
     <div class="brand">
       <span class="brand-mark">CF</span><strong>Controle de Frotas</strong>
     </div>

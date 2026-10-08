@@ -309,3 +309,58 @@ fleet-audit-list,
 fleet-workspace {
   display: block;
 }
+
+/* Controle de navegação no canto superior, ao lado do menu. */
+.app-shell {
+  --sidebar-width: 245px;
+  position: relative;
+}
+.app-shell.menu-collapsed {
+  --sidebar-width: 0px;
+}
+#main-sidebar[hidden] {
+  display: none;
+}
+.menu-toggle {
+  position: absolute;
+  top: 12px;
+  left: calc(var(--sidebar-width) + 12px);
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--navy);
+  background: white;
+  border: 1px solid #d7e0eb;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgb(20 40 63 / 8%);
+}
+.menu-toggle:hover {
+  background: #eaf1fb;
+  border-color: #3479e9;
+}
+.menu-toggle:focus-visible {
+  outline: 3px solid #3479e9;
+  outline-offset: 3px;
+}
+.app-shell > .content {
+  padding-top: 68px;
+}
+@media (max-width: 900px) {
+  .menu-toggle {
+    left: 12px;
+  }
+  .app-shell:not(.menu-collapsed) .menu-toggle {
+    color: white;
+    background: #284566;
+    border-color: #62748a;
+  }
+  .app-shell:not(.menu-collapsed) .brand {
+    padding-left: 46px;
+  }
+  .app-shell:not(.menu-collapsed) > .content {
+    padding-top: 22px;
+  }
+}
