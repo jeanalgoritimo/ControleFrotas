@@ -12,11 +12,12 @@ import {
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { VehicleBrand, VehicleModel } from "../catalog/catalog.models";
+import { BrazilianPlateDirective } from "./brazilian-plate.directive";
 import { Vehicle, Driver } from "./fleet.models";
 import { ApiClient } from "../../core/api-client";
 @Component({
   selector: "fleet-workspace",
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, BrazilianPlateDirective],
   templateUrl: "./fleet-workspace.html",
 })
 export class FleetWorkspace {

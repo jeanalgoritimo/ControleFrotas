@@ -59,6 +59,19 @@ public static class CatalogIntegration
             db.Vehicles.Add(new Vehicle { CompanyId = 2, Plate = "DEF1D23", Brand = "Toyota", Model = "Corolla", BrandId = brandId, ModelId = modelId, Year = 2024 });
             await db.SaveChangesAsync();
         });
+        await using (var db = Context())
+        {
+            var model = await db.VehicleModels.SingleAsync(m => m.BrandId == secondBrandId);
+            var vehicle = await new FleetService(new FleetStore(db), new CatalogStore(db)).SaveVehicle(1, "admin", null,
+                new VehicleRequest(" ghi-1234 ", "Moto", "Honda", "Corolla", 2024, 0, true, null, secondBrandId, model.Id), default);
+            Check(vehicle.Plate == "GHI1234" && vehicle.Category == "Moto", "Placa antiga salva sem máscara e sem converter combinação para moto");
+        }
+        await Rejected<DbUpdateException>(async db =>
+        {
+            var model = await db.VehicleModels.SingleAsync(m => m.BrandId == secondBrandId);
+            await new FleetService(new FleetStore(db), new CatalogStore(db)).SaveVehicle(1, "admin", null,
+                new VehicleRequest("ghi1234", "Carro", "Honda", "Corolla", 2024, 0, true, null, secondBrandId, model.Id), default);
+        });
         return checks;
     }
 }

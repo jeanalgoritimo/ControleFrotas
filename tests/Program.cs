@@ -21,6 +21,14 @@ Check(Validation.VehicleError(vehicle with { Odometer = -1 }) is not null, "Hod�
 Check(Validation.VehicleError(vehicle with { Odometer = 1.0001m }) is not null, "Precisão do hodômetro");
 Check(Validation.VehicleError(vehicle with { Category = "Inválida" }) is not null, "Categoria inexistente");
 Check(Validation.VehicleError(vehicle with { Brand = " " }) is not null, "Marca vazia");
+foreach (var category in new[] { "Carro", "Moto", "Van", "Utilitário" })
+{
+    Check(Validation.VehicleError(vehicle with { Category = category, Plate = " abc-1234 " }) is null, $"Placa antiga aceita para {category}");
+    Check(Validation.VehicleError(vehicle with { Category = category, Plate = " abc1d23 " }) is null, $"Placa Mercosul aceita para {category}");
+}
+foreach (var invalidPlate in new[] { "ABC12345", "ABC12D3", "AB11234", "ABC!1234", "A-BC1234", "ABC--1234", "ABC 1234", "ABC1234\nX", "ÁBC1234" })
+    Check(Validation.VehicleError(vehicle with { Plate = invalidPlate }) is not null, "Placa inválida não é transformada em outra placa válida");
+Check(Validation.Plate("abc-1234") == "ABC1234" && Validation.Plate("abc1d23") == "ABC1D23", "Persistência sem máscara não converte o padrão antigo");
 var driver = new DriverRequest("Motorista de teste", "52998224725", "12345678901", "B", new DateOnly(2030, 1, 1), true, null);
 Check(Validation.DriverError(driver) is null, "Motorista com formato válido");
 Check(Validation.DriverError(driver with { License = "abc" }) is not null, "Formato CNH inválido");

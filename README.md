@@ -135,3 +135,15 @@ Ao iniciar a API, a migration converte as marcas e modelos já preenchidos nos v
 5. Tente repetir ` toyota ` e `corolla` na mesma marca: deve haver bloqueio; o mesmo nome de modelo em outra marca é permitido.
 6. Renomeie uma marca/modelo e confira o veículo e a auditoria.
 7. Inative um modelo: ele deve sumir de novas seleções e continuar visível no veículo já vinculado.
+
+## Formato brasileiro de placas
+
+O campo converte letras ASCII para maiúsculas durante a digitação, identifica os dois padrões e acrescenta o hífen somente à apresentação da placa antiga. Mercosul: `ABC1D23` (LLLNLNN); antiga: `ABC-1234` (LLL-NNNN). São sete caracteres de identificação, armazenados sem máscara. A sequência é a mesma para Carro, Moto, Van e Utilitário; as diferenças físicas das placas não mudam a validação do número no cadastro.
+
+A interface mostra erros de formato e impede salvar o formulário inválido. Colar um texto longo não o trunca silenciosamente para outra placa. A API repete a validação e rejeita sinais fora do padrão, caracteres extras e hífens em posições erradas. O campo não converte a combinação antiga para Mercosul e não consulta a existência ou situação do veículo no Detran.
+
+Fontes oficiais consultadas em 09/10/2026: [Resolução CONTRAN 969/2022, art. 2º, §3º](https://www.gov.br/transportes/pt-br/assuntos/transito/conteudo-contran/resolucoes/resolucao9692022.pdf) e [Anexo I, item 1.2 e dimensões por tipo](https://www.gov.br/transportes/pt-br/assuntos/transito/conteudo-contran/resolucoes/resolucao9692022anexos.pdf). A troca regulamentada da placa antiga é uma operação do órgão de trânsito, não uma conversão automática feita neste cadastro. Placas especiais de representação não fazem parte do escopo desta frota leve.
+
+Execute `npm run check:plates` na pasta frontend para verificar a máscara, validação, colagem e cursor. O CI executa essas verificações junto com as regras da API e a integração SQL.
+
+Teste: digite `abc1234` (exibição `ABC-1234`, valor salvo `ABC1234`), `abc1d23` (exibição/valor `ABC1D23`), edite no meio do texto, apague com Backspace, cole os dois formatos e tente uma placa incompleta ou com caracteres extras. Trocar a categoria não altera a combinação.

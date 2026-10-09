@@ -120,7 +120,7 @@
   (close)="invalidateCatalog()"
   (cancel)="saving() ? $event.preventDefault() : null"
 >
-  <form (ngSubmit)="save()">
+  <form #vehicleForm="ngForm" (ngSubmit)="vehicleForm.valid && save()">
     <div class="modal-heading">
       <div>
         <p class="eyebrow">CADASTRO DA FROTA</p>
@@ -146,13 +146,28 @@
         <label for="plate" class="form-label">Placa</label
         ><input
           id="plate"
+          fleetPlate
+          #plateField="ngModel"
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
+          aria-describedby="plate-help plate-error"
+          [attr.aria-invalid]="plateField.invalid && (plateField.dirty || plateField.touched)"
+          [class.is-invalid]="plateField.invalid && (plateField.dirty || plateField.touched)"
           name="plate"
           class="form-control"
           [(ngModel)]="vehicle.plate"
           maxlength="8"
-          placeholder="ABC1D23"
+          placeholder="ABC1D23 ou ABC-1234"
           required
         />
+        <div id="plate-help" class="form-text">
+          Mercosul: ABC1D23 · Antiga: ABC-1234. Mesmo formato para carros,
+          motos, vans e utilitários.
+        </div>
+        <div id="plate-error" class="invalid-feedback">
+          Informe 3 letras, 1 número, 1 letra ou número e 2 números.
+        </div>
       </div>
       <div>
         <label for="category" class="form-label">Categoria</label
@@ -342,7 +357,7 @@
         Cancelar</button
       ><button
         class="btn btn-primary"
-        [disabled]="saving() || (kind === 'vehicle' && (catalogLoading() || modelsLoading() || catalogFailed() || !vehicle.brandId || !vehicle.modelId))"
+        [disabled]="saving() || vehicleForm.invalid || (kind === 'vehicle' && (catalogLoading() || modelsLoading() || catalogFailed() || !vehicle.brandId || !vehicle.modelId))"
       >
         {{saving() ? 'Salvando…' : 'Salvar'}}
       </button>
