@@ -37,7 +37,8 @@
     <small class="sidebar-caption">FROTA LEVE · EMPRESA INICIAL</small>
     <nav aria-label="Menu principal">
       @for (item of [{key:'overview',label:'Visão
-      geral'},{key:'vehicles',label:'Veículos'},{key:'drivers',label:'Motoristas'},{key:'fuel',label:'Abastecimentos'},{key:'audit',label:'Histórico
+      geral'},{key:'vehicles',label:'Veículos'},{key:'catalog',label:'Marcas e
+      modelos'},{key:'drivers',label:'Motoristas'},{key:'fuel',label:'Abastecimentos'},{key:'audit',label:'Histórico
       de alterações'}]; track item.key) {
       <button
         [class.selected]="tab() === item.key"
@@ -60,8 +61,9 @@
         <p class="eyebrow">CONTROLE DE FROTAS</p>
         <h1>
           {{tab() === 'overview' ? 'Visão geral' : tab() === 'vehicles' ?
-          'Veículos' : tab() === 'drivers' ? 'Motoristas' : tab() === 'fuel' ?
-          'Abastecimentos' : 'Histórico de alterações'}}
+          'Veículos' : tab() === 'catalog' ? 'Marcas e modelos' : tab() ===
+          'drivers' ? 'Motoristas' : tab() === 'fuel' ? 'Abastecimentos' :
+          'Histórico de alterações'}}
         </h1>
         <p class="text-secondary">
           {{tab() === 'overview' ? 'Uma visão clara dos seus cadastros.' :
@@ -99,6 +101,11 @@
     } @if (tab() === 'fuel') {
     <fleet-fuel
       [vehicles]="vehicles()"
+      [refreshKey]="fuelRefresh()"
+      (saved)="message.set($event); load()"
+    />
+    } @if (tab() === 'catalog') {
+    <fleet-catalog
       [refreshKey]="fuelRefresh()"
       (saved)="message.set($event); load()"
     />

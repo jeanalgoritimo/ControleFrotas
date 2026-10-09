@@ -368,3 +368,27 @@ fleet-workspace {
 fleet-fuel {
   display: block;
 }
+
+fleet-catalog {
+  display: block;
+}
+.catalog-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 24px;
+  align-items: start;
+}
+.catalog-scroll {
+  max-height: 520px;
+  overflow: auto;
+}
+.catalog-scroll th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+@media (max-width: 1100px) {
+  .catalog-grid {
+    grid-template-columns: 1fr;
+  }
+}

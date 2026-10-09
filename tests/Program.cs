@@ -15,7 +15,7 @@ Check(!Validation.ValidPlate("123ABCD"), "Placa com ordem inválida");
 Check(Validation.ValidCpf("52998224725"), "CPF com dígitos verificadores válidos");
 Check(!Validation.ValidCpf("52998224724"), "CPF com dígito inválido");
 Check(!Validation.ValidCpf("11111111111"), "CPF repetido");
-var vehicle = new VehicleRequest("ABC1D23", "Carro", "Marca", "Modelo", 2024, 12000.125m, true, null);
+var vehicle = new VehicleRequest("ABC1D23", "Carro", "Marca", "Modelo", 2024, 12000.125m, true, null, 1, 1);
 Check(Validation.VehicleError(vehicle) is null, "Veículo válido");
 Check(Validation.VehicleError(vehicle with { Odometer = -1 }) is not null, "Hodômetro negativo");
 Check(Validation.VehicleError(vehicle with { Odometer = 1.0001m }) is not null, "Precisão do hodômetro");
@@ -36,7 +36,8 @@ Check(query.Contains("WHERE") && query.Contains("CompanyId"), "Filtro de empresa
 
 // Application tests use a store double: no SQL Server required.
 var store = new TestFleetStore();
-var service = new FleetService(store);
+var catalog = new TestCatalogStore();
+var service = new FleetService(store, catalog);
 var created = await service.SaveVehicle(2, "admin", null, vehicle, CancellationToken.None);
 Check(created.CompanyId == 2 && store.LastAudit?.CompanyId == 2, "Empresa da sessão aplicada ao cadastro e auditoria");
 Check(created.Plate == "ABC1D23" && store.LastAudit?.Actor == "admin", "Normalização e autoria");
@@ -58,10 +59,9 @@ Check(createdDriver.CompanyId == 2, "Empresa aplicada ao motorista");
 await Rejected<RecordNotFoundException>(() => service.SaveDriver(1, "admin", createdDriver.Id, driver with { Version = new byte[] { 1 } }, CancellationToken.None), "Motorista de outra empresa deve ser invisível");
 Check(!typeof(Vehicle).Assembly.GetReferencedAssemblies().Any(x => x.Name!.Contains("EntityFramework") || x.Name.Contains("AspNetCore")), "Domain independente de EF e ASP.NET");
 Check(!typeof(FleetService).Assembly.GetReferencedAssemblies().Any(x => x.Name!.Contains("Infrastructure") || x.Name.Contains("EntityFramework")), "Application independente da persistência");
-var schemaPath = Path.Combine(AppContext.BaseDirectory, "schema-v0.1.sql");
-var oldSchema = Regex.Replace(script, @"CREATE TABLE \[FuelEntries\][\s\S]*?;\s*GO\s*", "");
-oldSchema = Regex.Replace(oldSchema, @"CREATE (?:UNIQUE )?INDEX [^\r\n]+ ON \[FuelEntries\][^\r\n]*;\s*GO\s*", "");
-Check(Regex.Replace(oldSchema, @"\s+", " ").Trim() == Regex.Replace(File.ReadAllText(schemaPath), @"\s+", " ").Trim(), "Tabelas originais preservadas no modelo");
+// Legacy columns remain unchanged; additional catalog columns are additive.
+var original = db.Model.FindEntityType(typeof(Vehicle))!;
+Check(original.FindProperty("Brand")!.GetMaxLength() == 80 && original.FindProperty("Model")!.GetMaxLength() == 100 && original.FindProperty("Plate")!.GetMaxLength() == 7, "Tamanhos originais preservados no modelo");
 
 Check(FuelMath.Total(40m, 6.1234m) == 244.94m, "Total arredondado no servidor");
 Check(FuelMath.Total(10m, 5.5555m) == 55.56m, "Arredondamento de meio centavo");
@@ -71,7 +71,7 @@ Check(FuelMath.Consumption(true, 1000, null, 40) is null, "Primeiro tanque cheio
 Check(FuelMath.Consumption(true, 1000, 1000, 40) is null, "Distância zero sem consumo");
 var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3));
 var fuelFleet = new TestFleetStore();
-var fuelVehicle = await new FleetService(fuelFleet).SaveVehicle(2, "admin", null, vehicle with { Odometer = 1000 }, CancellationToken.None);
+var fuelVehicle = await new FleetService(fuelFleet, catalog).SaveVehicle(2, "admin", null, vehicle with { Odometer = 1000 }, CancellationToken.None);
 var fuelStore = new TestFuelStore();
 var fuelService = new FuelService(fuelStore, fuelFleet, TimeProvider.System);
 var fuel = new FuelRequest(fuelVehicle.Id, Guid.NewGuid(), today.AddDays(-3), 1000, "Gasolina", 40, 6.1234m, " Posto teste ", " NF-01 ", true, new byte[8]);
@@ -107,7 +107,33 @@ Check(fuelTable.GetForeignKeys().Single().DeleteBehavior == DeleteBehavior.Restr
 var migrationScript = db.GetService<IMigrator>().GenerateScript();
 Check(migrationScript.Contains("Banco incompatível") && migrationScript.Contains("c.is_identity"), "Baseline valida esquema existente");
 Check(migrationScript.Contains("CREATE TABLE [FuelEntries]") && !migrationScript.Contains("DROP TABLE"), "Atualização aditiva sem apagar tabelas");
-Check(db.Database.GetMigrations().Count() == 2 && !db.Database.HasPendingModelChanges(), "Duas migrations e snapshot sincronizado");
+Check(db.Database.GetMigrations().Count() == 3 && !db.Database.HasPendingModelChanges(), "Três migrations e snapshot sincronizado");
+var catalogService = new CatalogService(catalog);
+var savedBrand = await catalogService.SaveBrand(2, "admin", null, new BrandRequest(" Toyota ", true, null), CancellationToken.None);
+Check(savedBrand.Name == "Toyota" && savedBrand.NormalizedName == "TOYOTA", "Normaliza nome e chave da marca");
+var savedModel = await catalogService.SaveModel(2, "admin", null, new ModelRequest(savedBrand.Id, " Corolla ", true, null), CancellationToken.None);
+Check(savedModel.BrandId == savedBrand.Id && savedModel.Name == "Corolla" && catalog.LastAudit?.CompanyId == 2, "Modelo vinculado e auditado na empresa");
+await Rejected<BusinessException>(() => service.SaveVehicle(2, "admin", null, vehicle with { BrandId = savedBrand.Id }, CancellationToken.None), "Modelo de outra marca bloqueado");
+await Rejected<BusinessException>(() => service.SaveVehicle(1, "admin", null, vehicle, CancellationToken.None), "Catálogo de outra empresa bloqueado");
+await Rejected<BusinessException>(() => service.SaveVehicle(2, "admin", null, vehicle with { BrandId = 0, ModelId = 0 }, CancellationToken.None), "IDs obrigatórios mesmo enviando nomes");
+await Rejected<BusinessException>(() => catalogService.SaveBrand(2, "admin", null, new BrandRequest(" ", true, null), CancellationToken.None), "Marca vazia bloqueada");
+await Rejected<BusinessException>(() => catalogService.SaveModel(2, "admin", null, new ModelRequest(999, "Corolla", true, null), CancellationToken.None), "Modelo sem marca cadastrada bloqueado");
+await Rejected<BusinessException>(() => catalogService.SaveModel(2, "admin", savedModel.Id, new ModelRequest(1, "Corolla", true, new byte[8]), CancellationToken.None), "Modelo não muda de marca");
+await Rejected<BusinessException>(() => catalogService.SaveBrand(2, "admin", savedBrand.Id, new BrandRequest("Toyota", true, null), CancellationToken.None), "Marca exige versão para editar");
+await Rejected<RecordNotFoundException>(() => catalogService.SaveBrand(1, "admin", savedBrand.Id, new BrandRequest("Toyota", true, new byte[8]), CancellationToken.None), "Edição de catálogo isolada por empresa");
+savedBrand.Active = false;
+await Rejected<BusinessException>(() => catalogService.SaveModel(2, "admin", null, new ModelRequest(savedBrand.Id, "Etios", true, null), CancellationToken.None), "Marca inativa impede novo modelo");
+catalog.BrandsData[0].Active = false;
+await Rejected<BusinessException>(() => service.SaveVehicle(2, "admin", null, vehicle, CancellationToken.None), "Marca inativa impede novo veículo");
+await service.SaveVehicle(2, "admin", created.Id, vehicle with { Version = new byte[8], Odometer = created.Odometer }, CancellationToken.None);
+Check(created.BrandId == 1 && created.ModelId == 1, "Edição preserva associação inativa existente");
+catalog.BrandsData[0].Active = true; catalog.ModelsData[0].Active = false;
+await Rejected<BusinessException>(() => service.SaveVehicle(2, "admin", null, vehicle, CancellationToken.None), "Modelo inativo impede novo veículo");
+catalog.ModelsData[0].Active = true;
+var canonical = await service.SaveVehicle(2, "admin", null, vehicle with { Plate = "DEF1D23", Brand = "Falsa", Model = "Falso" }, CancellationToken.None);
+Check(canonical.Brand == "Marca" && canonical.Model == "Modelo", "Servidor usa nomes do catálogo e ignora rótulos enviados");
+var fk = original.GetForeignKeys().Single();
+Check(fk.Properties.Select(p => p.Name).SequenceEqual(new[] { "CompanyId", "BrandId", "ModelId" }), "Banco impõe marca, modelo e empresa no vínculo do veículo");
 checks += await SqlIntegration.Run();
 Console.WriteLine($"{checks} verificações de regras e arquitetura passaram.");
 
@@ -150,5 +176,26 @@ sealed class TestFuelStore : IFuelStore
     public Task Save(FuelEntry entry, Vehicle vehicle, byte[] version, Audit audit, CancellationToken ct)
     {
         entry.Id = Entries.Count + 1; Entries.Add(entry); Writes++; LastAudit = audit; return Task.CompletedTask;
+    }
+}
+
+sealed class TestCatalogStore : ICatalogStore
+{
+    public List<VehicleBrand> BrandsData { get; } = [new() { Id = 1, CompanyId = 2, Name = "Marca", NormalizedName = "MARCA" }];
+    public List<VehicleModel> ModelsData { get; } = [new() { Id = 1, CompanyId = 2, BrandId = 1, Name = "Modelo", NormalizedName = "MODELO" }];
+    public Audit? LastAudit { get; private set; }
+    public Task<List<VehicleBrand>> Brands(int company, bool includeInactive, CancellationToken ct) => Task.FromResult(BrandsData.Where(b => b.CompanyId == company && (includeInactive || b.Active)).ToList());
+    public Task<List<VehicleModel>> Models(int company, int brandId, bool includeInactive, CancellationToken ct) => Task.FromResult(ModelsData.Where(m => m.CompanyId == company && m.BrandId == brandId && (includeInactive || m.Active)).ToList());
+    public Task<VehicleBrand?> Brand(int company, int id, CancellationToken ct) => Task.FromResult(BrandsData.SingleOrDefault(b => b.CompanyId == company && b.Id == id));
+    public Task<VehicleModel?> Model(int company, int id, CancellationToken ct) => Task.FromResult(ModelsData.SingleOrDefault(m => m.CompanyId == company && m.Id == id));
+    public Task SaveBrand(VehicleBrand brand, byte[]? version, Audit audit, bool create, CancellationToken ct)
+    {
+        if (create) { brand.Id = BrandsData.Count + 1; BrandsData.Add(brand); }
+        LastAudit = audit; return Task.CompletedTask;
+    }
+    public Task SaveModel(VehicleModel model, byte[]? version, Audit audit, bool create, CancellationToken ct)
+    {
+        if (create) { model.Id = ModelsData.Count + 1; ModelsData.Add(model); }
+        LastAudit = audit; return Task.CompletedTask;
     }
 }

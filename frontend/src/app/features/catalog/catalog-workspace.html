@@ -1,0 +1,271 @@
+<p class="text-secondary mb-4">
+  Cadastre primeiro a marca e depois os modelos. Esses dados serão usados na
+  seleção do veículo.
+</p>
+@if (error()) {
+<div class="alert alert-danger" role="alert">
+  {{error()}}
+  <button
+    type="button"
+    class="btn btn-sm btn-outline-danger ms-2"
+    (click)="load()"
+  >
+    Tentar novamente
+  </button>
+</div>
+}
+<div class="catalog-grid">
+  <section class="panel" aria-labelledby="brands-title">
+    <div class="toolbar border-bottom">
+      <div>
+        <h2 id="brands-title" class="mb-1">Marcas</h2>
+        <small class="text-secondary">{{brandRows().length}} marca(s)</small>
+      </div>
+      <button type="button" class="btn btn-primary" (click)="openBrand()">
+        + Nova marca
+      </button>
+    </div>
+    <div class="p-3 border-bottom">
+      <label for="brand-search" class="visually-hidden">Buscar marca</label
+      ><input
+        id="brand-search"
+        type="search"
+        class="form-control"
+        placeholder="Buscar marca…"
+        [ngModel]="query()"
+        (ngModelChange)="query.set($event)"
+      /><label class="form-check mt-3 mb-0"
+        ><input
+          type="checkbox"
+          class="form-check-input"
+          [ngModel]="onlyActive()"
+          (ngModelChange)="onlyActive.set($event)"
+        />
+        Somente cadastros ativos</label
+      >
+    </div>
+    @if (loading()) {
+    <p class="p-3 mb-0" role="status">Carregando marcas…</p>
+    }
+    <div class="catalog-scroll table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Marca</th>
+            <th scope="col">Situação</th>
+            <th scope="col" class="text-end">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (brand of brandRows(); track brand.id) {
+          <tr [class.table-primary]="selectedBrand() === brand.id">
+            <td>
+              <button
+                type="button"
+                class="btn btn-link text-start p-0 fw-semibold"
+                [attr.aria-pressed]="selectedBrand() === brand.id"
+                (click)="selectBrand(brand.id)"
+              >
+                {{brand.name}}
+              </button>
+            </td>
+            <td>
+              <span class="status" [class.inactive]="!brand.active"
+                >{{brand.active ? 'Ativa' : 'Inativa'}}</span
+              >
+            </td>
+            <td class="text-end">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-primary"
+                (click)="openBrand(brand)"
+                [attr.aria-label]="'Editar marca ' + brand.name"
+              >
+                Editar
+              </button>
+            </td>
+          </tr>
+          } @empty { @if (!loading()) {
+          <tr>
+            <td colspan="3" class="empty">Nenhuma marca encontrada.</td>
+          </tr>
+          } }
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="panel" aria-labelledby="models-title">
+    <div class="toolbar border-bottom">
+      <div>
+        <h2 id="models-title" class="mb-1">Modelos</h2>
+        <small class="text-secondary"
+          >{{brandName() ? 'Marca: ' + brandName() : 'Selecione uma
+          marca'}}</small
+        >
+      </div>
+      <button
+        type="button"
+        class="btn btn-primary"
+        (click)="openModel()"
+        [disabled]="!brands().length || loading()"
+      >
+        + Novo modelo
+      </button>
+    </div>
+    <div class="p-3 border-bottom">
+      <label for="catalog-brand" class="form-label">Marca dos modelos</label
+      ><select
+        id="catalog-brand"
+        class="form-select"
+        [ngModel]="selectedBrand()"
+        (ngModelChange)="selectBrand($event)"
+        [disabled]="loading()"
+      >
+        <option [ngValue]="0">Selecione uma marca</option>
+        @for (brand of brands(); track brand.id) {
+        <option [ngValue]="brand.id">
+          {{brand.name}}{{brand.active ? '' : ' (inativa)'}}
+        </option>
+        }
+      </select>
+    </div>
+    @if (modelsLoading()) {
+    <p class="p-3 mb-0" role="status">Carregando modelos…</p>
+    }
+    <div class="catalog-scroll table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Modelo</th>
+            <th scope="col">Situação</th>
+            <th scope="col" class="text-end">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (model of modelRows(); track model.id) {
+          <tr>
+            <td class="fw-semibold">{{model.name}}</td>
+            <td>
+              <span class="status" [class.inactive]="!model.active"
+                >{{model.active ? 'Ativo' : 'Inativo'}}</span
+              >
+            </td>
+            <td class="text-end">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-primary"
+                (click)="openModel(model)"
+                [attr.aria-label]="'Editar modelo ' + model.name"
+              >
+                Editar
+              </button>
+            </td>
+          </tr>
+          } @empty { @if (!modelsLoading()) {
+          <tr>
+            <td colspan="3" class="empty">
+              {{selectedBrand() ? 'Nenhum modelo encontrado para esta marca.' :
+              'Selecione uma marca para consultar os modelos.'}}
+            </td>
+          </tr>
+          } }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+<dialog
+  #editor
+  aria-labelledby="catalog-editor-title"
+  (cancel)="saving() && $event.preventDefault()"
+>
+  <form #catalogForm="ngForm" (ngSubmit)="save()">
+    <div class="modal-heading">
+      <h2 id="catalog-editor-title" class="mb-0">
+        {{record.id ? 'Editar' : 'Cadastrar'}} {{kind === 'brand' ? 'marca' :
+        'modelo'}}
+      </h2>
+      <button
+        type="button"
+        class="btn-close"
+        aria-label="Fechar"
+        (click)="close()"
+        [disabled]="saving()"
+      ></button>
+    </div>
+    @if (modalError()) {
+    <div class="alert alert-danger" role="alert">{{modalError()}}</div>
+    } @if (kind === 'model') {
+    <div class="mb-3">
+      <label for="model-brand" class="form-label">Marca</label
+      ><select
+        id="model-brand"
+        name="brandId"
+        class="form-select"
+        [(ngModel)]="record.brandId"
+        [disabled]="!!record.id || saving()"
+        required
+      >
+        <option [ngValue]="0">Selecione uma marca</option>
+        @for (brand of brands(); track brand.id) { @if (brand.active || brand.id
+        === record.brandId) {
+        <option [ngValue]="brand.id">
+          {{brand.name}}{{brand.active ? '' : ' (inativa)'}}
+        </option>
+        } }</select
+      >@if (record.id) {
+      <div class="form-text">
+        O modelo permanece vinculado à marca original.
+      </div>
+      }
+    </div>
+    }
+    <div class="mb-3">
+      <label for="catalog-name" class="form-label"
+        >{{kind === 'brand' ? 'Nome da marca' : 'Nome do modelo'}}</label
+      ><input
+        id="catalog-name"
+        name="name"
+        class="form-control"
+        [(ngModel)]="record.name"
+        [maxlength]="kind === 'brand' ? 80 : 100"
+        [placeholder]="kind === 'brand' ? 'Ex.: Toyota' : 'Ex.: Corolla'"
+        [disabled]="saving()"
+        required
+      />
+      <div class="form-text">
+        {{kind === 'brand' ? 'Até 80 caracteres.' : 'Até 100 caracteres. Não
+        inclua a marca no nome do modelo.'}}
+      </div>
+    </div>
+    <label class="form-check"
+      ><input
+        type="checkbox"
+        name="active"
+        class="form-check-input"
+        [(ngModel)]="record.active"
+        [disabled]="saving()"
+      />
+      Cadastro ativo</label
+    >
+    <p class="form-text">
+      Cadastros inativos são preservados nos veículos existentes e não aparecem
+      em novas seleções.
+    </p>
+    <div class="modal-actions">
+      <button
+        type="button"
+        class="btn btn-outline-secondary"
+        (click)="close()"
+        [disabled]="saving()"
+      >
+        Cancelar</button
+      ><button
+        class="btn btn-primary"
+        [disabled]="saving() || catalogForm.invalid || !record.name.trim() || (kind === 'model' && !record.brandId)"
+      >
+        {{saving() ? 'Salvando…' : 'Salvar'}}
+      </button>
+    </div>
+  </form>
+</dialog>

@@ -8,8 +8,22 @@ public class FleetDb(DbContextOptions<FleetDb> options) : DbContext(options)
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Audit> Audits => Set<Audit>();
     public DbSet<FuelEntry> FuelEntries => Set<FuelEntry>();
+    public DbSet<VehicleBrand> VehicleBrands => Set<VehicleBrand>();
+    public DbSet<VehicleModel> VehicleModels => Set<VehicleModel>();
     protected override void OnModelCreating(ModelBuilder model)
     {
+        model.Entity<VehicleBrand>().Property(x => x.Name).HasMaxLength(80);
+        model.Entity<VehicleBrand>().Property(x => x.NormalizedName).HasMaxLength(80).UseCollation("Latin1_General_100_BIN2");
+        model.Entity<VehicleBrand>().Property(x => x.Version).IsRowVersion();
+        model.Entity<VehicleBrand>().HasIndex(x => new { x.CompanyId, x.NormalizedName }).IsUnique();
+        model.Entity<VehicleBrand>().HasAlternateKey(x => new { x.CompanyId, x.Id });
+        model.Entity<VehicleModel>().Property(x => x.Name).HasMaxLength(100);
+        model.Entity<VehicleModel>().Property(x => x.NormalizedName).HasMaxLength(100).UseCollation("Latin1_General_100_BIN2");
+        model.Entity<VehicleModel>().Property(x => x.Version).IsRowVersion();
+        model.Entity<VehicleModel>().HasIndex(x => new { x.CompanyId, x.BrandId, x.NormalizedName }).IsUnique();
+        model.Entity<VehicleModel>().HasAlternateKey(x => new { x.CompanyId, x.BrandId, x.Id });
+        model.Entity<VehicleModel>().HasOne<VehicleBrand>().WithMany().HasForeignKey(x => new { x.CompanyId, x.BrandId }).HasPrincipalKey(x => new { x.CompanyId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<Vehicle>().HasOne<VehicleModel>().WithMany().HasForeignKey(x => new { x.CompanyId, x.BrandId, x.ModelId }).HasPrincipalKey(x => new { x.CompanyId, x.BrandId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FuelEntry>().Property(e => e.Odometer).HasPrecision(12, 3);
         model.Entity<FuelEntry>().Property(e => e.Liters).HasPrecision(8, 3);
         model.Entity<FuelEntry>().Property(e => e.UnitPrice).HasPrecision(8, 4);
