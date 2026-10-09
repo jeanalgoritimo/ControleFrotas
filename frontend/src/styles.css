@@ -364,3 +364,7 @@ fleet-workspace {
     padding-top: 22px;
   }
 }
+
+fleet-fuel {
+  display: block;
+}

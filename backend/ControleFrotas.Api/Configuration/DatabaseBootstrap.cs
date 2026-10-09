@@ -9,7 +9,7 @@ public static class DatabaseBootstrap
         using (var scope = app.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<FleetDb>();
-            await db.Database.EnsureCreatedAsync();
+            await db.Database.MigrateAsync();
             if (!await db.Accounts.AnyAsync())
             {
                 var username = app.Configuration["Bootstrap:Username"];

@@ -37,7 +37,7 @@
     <small class="sidebar-caption">FROTA LEVE · EMPRESA INICIAL</small>
     <nav aria-label="Menu principal">
       @for (item of [{key:'overview',label:'Visão
-      geral'},{key:'vehicles',label:'Veículos'},{key:'drivers',label:'Motoristas'},{key:'audit',label:'Histórico
+      geral'},{key:'vehicles',label:'Veículos'},{key:'drivers',label:'Motoristas'},{key:'fuel',label:'Abastecimentos'},{key:'audit',label:'Histórico
       de alterações'}]; track item.key) {
       <button
         [class.selected]="tab() === item.key"
@@ -60,8 +60,8 @@
         <p class="eyebrow">CONTROLE DE FROTAS</p>
         <h1>
           {{tab() === 'overview' ? 'Visão geral' : tab() === 'vehicles' ?
-          'Veículos' : tab() === 'drivers' ? 'Motoristas' : 'Histórico de
-          alterações'}}
+          'Veículos' : tab() === 'drivers' ? 'Motoristas' : tab() === 'fuel' ?
+          'Abastecimentos' : 'Histórico de alterações'}}
         </h1>
         <p class="text-secondary">
           {{tab() === 'overview' ? 'Uma visão clara dos seus cadastros.' :
@@ -94,6 +94,12 @@
       [tab]="tab()"
       [vehicles]="vehicles()"
       [drivers]="drivers()"
+      (saved)="message.set($event); load()"
+    />
+    } @if (tab() === 'fuel') {
+    <fleet-fuel
+      [vehicles]="vehicles()"
+      [refreshKey]="fuelRefresh()"
       (saved)="message.set($event); load()"
     />
     } @if (tab() === 'audit') { <fleet-audit-list [audits]="audits()" /> }

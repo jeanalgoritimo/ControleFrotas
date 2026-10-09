@@ -27,5 +27,8 @@ public static class ServiceRegistration
         });
         builder.Services.AddScoped<IFleetStore, FleetStore>();
         builder.Services.AddScoped<FleetService>();
+        builder.Services.AddScoped<IFuelStore, FuelStore>();
+        builder.Services.AddScoped<FuelService>();
+        builder.Services.AddSingleton(TimeProvider.System);
     }
 }

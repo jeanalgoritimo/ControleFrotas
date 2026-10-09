@@ -1,0 +1,328 @@
+<section class="metrics mb-4" aria-label="Resumo dos abastecimentos filtrados">
+  <article>
+    <span>Abastecimentos</span><strong>{{data().totalCount}}</strong
+    ><small>No filtro selecionado</small>
+  </article>
+  <article>
+    <span>Volume total</span
+    ><strong>{{data().totalLiters | number:'1.0-3':'pt-BR'}} L</strong
+    ><small>No filtro selecionado</small>
+  </article>
+  <article>
+    <span>Valor total</span
+    ><strong
+      >{{data().totalCost | currency:'BRL':'symbol':'1.2-2':'pt-BR'}}</strong
+    ><small>No filtro selecionado</small>
+  </article>
+</section>
+@if (error()) {
+<div class="alert alert-danger" role="alert">{{error()}}</div>
+}
+<section class="panel">
+  <form class="toolbar" (ngSubmit)="filter()">
+    <div>
+      <label for="fuel-filter-vehicle" class="form-label">Veículo</label
+      ><select
+        id="fuel-filter-vehicle"
+        name="filterVehicle"
+        class="form-select"
+        [(ngModel)]="filterVehicle"
+      >
+        <option [ngValue]="0">Todos os veículos</option>
+        @for(v of vehicles(); track v.id) {
+        <option [ngValue]="v.id">{{v.plate}} · {{v.model}}</option>
+        }
+      </select>
+    </div>
+    <div>
+      <label for="fuel-from" class="form-label">De</label
+      ><input
+        id="fuel-from"
+        name="from"
+        type="date"
+        class="form-control"
+        [(ngModel)]="from"
+      />
+    </div>
+    <div>
+      <label for="fuel-to" class="form-label">Até</label
+      ><input
+        id="fuel-to"
+        name="to"
+        type="date"
+        class="form-control"
+        [(ngModel)]="to"
+      />
+    </div>
+    <button class="btn btn-outline-primary" [disabled]="loading()">
+      Filtrar
+    </button>
+    <button
+      type="button"
+      class="btn btn-primary"
+      (click)="open()"
+      [disabled]="activeVehicles().length === 0"
+    >
+      + Novo abastecimento
+    </button>
+  </form>
+  @if (activeVehicles().length === 0) {
+  <p class="px-4 text-secondary">
+    Cadastre ou ative um veículo para registrar abastecimentos.
+  </p>
+  } @if (loading()) {
+  <p class="px-4" role="status">Carregando abastecimentos…</p>
+  }
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>Veículo / Data</th>
+          <th>Hodômetro</th>
+          <th>Combustível</th>
+          <th>Volume / Preço</th>
+          <th>Total</th>
+          <th>Consumo</th>
+          <th>Posto / Documento</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for(e of data().items; track e.id) {
+        <tr>
+          <td>
+            <strong>{{e.plate}}</strong
+            ><small class="d-block text-secondary"
+              >{{e.date | date:'dd/MM/yyyy'}}</small
+            >
+          </td>
+          <td>{{e.odometer | number:'1.0-3':'pt-BR'}} km</td>
+          <td>
+            {{e.fuelType}}<small class="d-block text-secondary"
+              >{{e.fullTank ? 'Tanque cheio' : 'Parcial'}}</small
+            >
+          </td>
+          <td>
+            {{e.liters | number:'1.0-3':'pt-BR'}} L<small
+              class="d-block text-secondary"
+              >{{e.unitPrice | currency:'BRL':'symbol':'1.2-4':'pt-BR'}} /
+              L</small
+            >
+          </td>
+          <td>{{e.total | currency:'BRL':'symbol':'1.2-2':'pt-BR'}}</td>
+          <td>
+            @if (e.kmPerLiter !== null) { {{e.kmPerLiter |
+            number:'1.2-2':'pt-BR'}} km/L } @else {
+            <span class="text-secondary">Sem intervalo completo</span> }
+          </td>
+          <td>
+            {{e.station}}<small class="d-block text-secondary"
+              >{{e.reference || 'Sem documento informado'}}</small
+            >
+          </td>
+        </tr>
+        } @empty {
+        <tr>
+          <td colspan="7" class="empty">Nenhum abastecimento encontrado.</td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <footer class="table-footer">
+    <span
+      >{{data().totalCount}} registros · Página {{page()}} de {{pages()}}</span
+    >
+    <div>
+      <button
+        type="button"
+        class="btn btn-outline-secondary btn-sm me-2"
+        [disabled]="page() <= 1 || loading()"
+        (click)="changePage(-1)"
+      >
+        Anterior</button
+      ><button
+        type="button"
+        class="btn btn-outline-secondary btn-sm"
+        [disabled]="page() >= pages() || loading()"
+        (click)="changePage(1)"
+      >
+        Próxima
+      </button>
+    </div>
+  </footer>
+</section>
+<p class="text-secondary mt-3">
+  O consumo usa a distância e todos os litros registrados entre dois
+  abastecimentos de tanque cheio. O primeiro tanque cheio estabelece a
+  referência. Os lançamentos devem seguir a ordem de data e hodômetro.
+</p>
+<dialog
+  #editor
+  aria-labelledby="fuel-editor-title"
+  (cancel)="saving() ? $event.preventDefault() : null"
+>
+  <form #fuelForm="ngForm" (ngSubmit)="fuelForm.valid && save()">
+    <div class="modal-heading">
+      <div>
+        <p class="eyebrow">OPERAÇÃO DA FROTA</p>
+        <h2 id="fuel-editor-title">Novo abastecimento</h2>
+      </div>
+      <button
+        type="button"
+        class="btn-close"
+        aria-label="Fechar"
+        [disabled]="saving()"
+        (click)="close()"
+      ></button>
+    </div>
+    @if(modalError()) {
+    <div class="alert alert-danger" role="alert">{{modalError()}}</div>
+    }
+    <fieldset class="border-0 p-0 m-0" [disabled]="saving()">
+      <div class="form-grid">
+        <div class="full">
+          <label for="fuel-vehicle" class="form-label">Veículo</label
+          ><select
+            id="fuel-vehicle"
+            name="vehicleId"
+            class="form-select"
+            [(ngModel)]="vehicleId"
+            (ngModelChange)="selectVehicle()"
+            required
+          >
+            <option [ngValue]="0" disabled>Selecione o veículo</option>
+            @for(v of activeVehicles(); track v.id) {
+            <option [ngValue]="v.id">
+              {{v.plate}} · {{v.brand}} {{v.model}}
+            </option>
+            }
+          </select>
+        </div>
+        <div>
+          <label for="fuel-date" class="form-label">Data</label
+          ><input
+            id="fuel-date"
+            name="date"
+            type="date"
+            class="form-control"
+            [(ngModel)]="date"
+            [max]="today()"
+            required
+          />
+        </div>
+        <div>
+          <label for="fuel-odometer" class="form-label">Hodômetro (km)</label
+          ><input
+            id="fuel-odometer"
+            name="odometer"
+            type="number"
+            class="form-control"
+            [(ngModel)]="odometer"
+            min="0"
+            max="999999999"
+            step="0.001"
+            required
+          />
+        </div>
+        <div>
+          <label for="fuel-type" class="form-label">Combustível</label
+          ><select
+            id="fuel-type"
+            name="fuelType"
+            class="form-select"
+            [(ngModel)]="fuelType"
+          >
+            @for(type of ['Gasolina','Etanol','Diesel']; track type) {
+            <option>{{type}}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label for="fuel-liters" class="form-label">Volume (litros)</label
+          ><input
+            id="fuel-liters"
+            name="liters"
+            type="number"
+            class="form-control"
+            [(ngModel)]="liters"
+            min="0.001"
+            max="9999.999"
+            step="0.001"
+            required
+          />
+        </div>
+        <div>
+          <label for="fuel-price" class="form-label">Preço por litro (R$)</label
+          ><input
+            id="fuel-price"
+            name="unitPrice"
+            type="number"
+            class="form-control"
+            [(ngModel)]="unitPrice"
+            min="0.0001"
+            max="9999.9999"
+            step="0.0001"
+            required
+          />
+        </div>
+        <div>
+          <span class="form-label d-block">Total calculado</span
+          ><strong
+            >{{totalPreview() |
+            currency:'BRL':'symbol':'1.2-2':'pt-BR'}}</strong
+          >
+        </div>
+        <div class="full">
+          <label for="fuel-station" class="form-label">Posto</label
+          ><input
+            id="fuel-station"
+            name="station"
+            class="form-control"
+            [(ngModel)]="station"
+            maxlength="150"
+            required
+          />
+        </div>
+        <div class="full">
+          <label for="fuel-reference" class="form-label"
+            >Documento / referência (opcional)</label
+          ><input
+            id="fuel-reference"
+            name="reference"
+            class="form-control"
+            [(ngModel)]="reference"
+            maxlength="80"
+          />
+        </div>
+        <div class="full">
+          <label class="form-check"
+            ><input
+              type="checkbox"
+              name="fullTank"
+              class="form-check-input"
+              [(ngModel)]="fullTank"
+            />
+            Tanque completamente cheio após abastecer</label
+          ><small class="text-secondary"
+            >Marque somente quando o tanque tiver sido completado.</small
+          >
+        </div>
+      </div>
+    </fieldset>
+    <div class="modal-actions">
+      <button
+        type="button"
+        class="btn btn-outline-secondary"
+        [disabled]="saving()"
+        (click)="close()"
+      >
+        Cancelar</button
+      ><button
+        class="btn btn-primary"
+        [disabled]="saving() || fuelForm.invalid || vehicleId <= 0"
+      >
+        {{saving() ? 'Registrando…' : 'Registrar abastecimento'}}
+      </button>
+    </div>
+  </form>
+</dialog>

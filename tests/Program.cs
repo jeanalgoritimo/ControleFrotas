@@ -1,3 +1,6 @@
+using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using ControleFrotas;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
@@ -56,7 +59,56 @@ await Rejected<RecordNotFoundException>(() => service.SaveDriver(1, "admin", cre
 Check(!typeof(Vehicle).Assembly.GetReferencedAssemblies().Any(x => x.Name!.Contains("EntityFramework") || x.Name.Contains("AspNetCore")), "Domain independente de EF e ASP.NET");
 Check(!typeof(FleetService).Assembly.GetReferencedAssemblies().Any(x => x.Name!.Contains("Infrastructure") || x.Name.Contains("EntityFramework")), "Application independente da persistência");
 var schemaPath = Path.Combine(AppContext.BaseDirectory, "schema-v0.1.sql");
-Check(script.Replace("\r\n", "\n").TrimEnd() == File.ReadAllText(schemaPath).Replace("\r\n", "\n").TrimEnd(), "Esquema SQL compatível com v0.1");
+var oldSchema = Regex.Replace(script, @"CREATE TABLE \[FuelEntries\][\s\S]*?;\s*GO\s*", "");
+oldSchema = Regex.Replace(oldSchema, @"CREATE (?:UNIQUE )?INDEX [^\r\n]+ ON \[FuelEntries\][^\r\n]*;\s*GO\s*", "");
+Check(Regex.Replace(oldSchema, @"\s+", " ").Trim() == Regex.Replace(File.ReadAllText(schemaPath), @"\s+", " ").Trim(), "Tabelas originais preservadas no modelo");
+
+Check(FuelMath.Total(40m, 6.1234m) == 244.94m, "Total arredondado no servidor");
+Check(FuelMath.Total(10m, 5.5555m) == 55.56m, "Arredondamento de meio centavo");
+Check(FuelMath.Consumption(true, 1500, 1000, 50) == 10m, "Consumo tanque cheio incluindo parciais");
+Check(FuelMath.Consumption(false, 1500, 1000, 50) is null, "Parcial sem consumo conclusivo");
+Check(FuelMath.Consumption(true, 1000, null, 40) is null, "Primeiro tanque cheio cria referência");
+Check(FuelMath.Consumption(true, 1000, 1000, 40) is null, "Distância zero sem consumo");
+var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3));
+var fuelFleet = new TestFleetStore();
+var fuelVehicle = await new FleetService(fuelFleet).SaveVehicle(2, "admin", null, vehicle with { Odometer = 1000 }, CancellationToken.None);
+var fuelStore = new TestFuelStore();
+var fuelService = new FuelService(fuelStore, fuelFleet, TimeProvider.System);
+var fuel = new FuelRequest(fuelVehicle.Id, Guid.NewGuid(), today.AddDays(-3), 1000, "Gasolina", 40, 6.1234m, " Posto teste ", " NF-01 ", true, new byte[8]);
+var first = await fuelService.Register(2, "admin", fuel, CancellationToken.None);
+Check(first.CompanyId == 2 && first.Total == 244.94m && first.Station == "Posto teste", "Empresa, total e normalização no abastecimento");
+Check(first.KmPerLiter is null && fuelStore.LastAudit?.Actor == "admin", "Referência inicial e autoria da auditoria");
+var repeat = await fuelService.Register(2, "admin", fuel, CancellationToken.None);
+Check(repeat.Id == first.Id && fuelStore.Writes == 1, "Reenvio idempotente sem duplicar lançamento");
+await Rejected<BusinessException>(() => fuelService.Register(2, "admin", fuel with { Liters = 41 }, CancellationToken.None), "Mesma solicitação com outros dados deve ser rejeitada");
+await Rejected<RecordNotFoundException>(() => fuelService.Register(1, "admin", fuel with { RequestId = Guid.NewGuid() }, CancellationToken.None), "Veículo de outra empresa bloqueado no abastecimento");
+await Rejected<BusinessException>(() => fuelService.Register(2, "admin", fuel with { RequestId = Guid.NewGuid(), Odometer = 999 }, CancellationToken.None), "Hodômetro regressivo bloqueado");
+await Rejected<BusinessException>(() => fuelService.Register(2, "admin", fuel with { RequestId = Guid.NewGuid(), Date = today.AddDays(-4) }, CancellationToken.None), "Data anterior ao último abastecimento bloqueada");
+fuelVehicle.Active = false;
+await Rejected<BusinessException>(() => fuelService.Register(2, "admin", fuel with { RequestId = Guid.NewGuid() }, CancellationToken.None), "Veículo inativo bloqueado");
+fuelVehicle.Active = true;
+var partial = await fuelService.Register(2, "admin", fuel with { RequestId = Guid.NewGuid(), Date = today.AddDays(-2), Odometer = 1200, Liters = 20, FullTank = false }, CancellationToken.None);
+var full = await fuelService.Register(2, "admin", fuel with { RequestId = Guid.NewGuid(), Date = today.AddDays(-1), Odometer = 1500, Liters = 30 }, CancellationToken.None);
+Check(partial.KmPerLiter is null && full.KmPerLiter == 10m, "Intervalo completo usa abastecimento parcial");
+Check(fuelVehicle.Odometer == 1500 && fuelStore.LastAudit?.CompanyId == 2, "Atualiza hodômetro e escopo da auditoria");
+foreach (var invalid in new[] {
+    fuel with { Liters = 0 }, fuel with { Liters = -1 }, fuel with { Liters = 1.0001m },
+    fuel with { UnitPrice = 0 }, fuel with { UnitPrice = 1.00001m }, fuel with { UnitPrice = 10000 },
+    fuel with { Date = today.AddDays(1) }, fuel with { Odometer = -1 }, fuel with { Odometer = 1.0001m },
+    fuel with { FuelType = "GNV" }, fuel with { Station = " " }, fuel with { Station = new string('x',151) },
+    fuel with { Reference = new string('x',81) }, fuel with { RequestId = Guid.Empty }, fuel with { VehicleVersion = null }
+}) await Rejected<BusinessException>(() => fuelService.Register(2, "admin", invalid, CancellationToken.None), "Dados inválidos de abastecimento rejeitados");
+await Rejected<BusinessException>(() => fuelService.List(2, new FuelQuery(Page: 0), CancellationToken.None), "Página inválida bloqueada");
+await Rejected<BusinessException>(() => fuelService.List(2, new FuelQuery(From: today, To: today.AddDays(-1)), CancellationToken.None), "Período invertido bloqueado");
+Check(fuelStore.Writes == 3, "Rejeições não geram lançamentos adicionais");
+var fuelTable = db.Model.FindEntityType(typeof(FuelEntry))!;
+Check(fuelTable.GetIndexes().Any(i => i.IsUnique && i.Properties.Select(p => p.Name).SequenceEqual(new[] { "CompanyId", "RequestId" })), "Índice de idempotência no banco");
+Check(fuelTable.GetForeignKeys().Single().DeleteBehavior == DeleteBehavior.Restrict, "Histórico de abastecimento protege veículo contra exclusão");
+var migrationScript = db.GetService<IMigrator>().GenerateScript();
+Check(migrationScript.Contains("Banco incompatível") && migrationScript.Contains("c.is_identity"), "Baseline valida esquema existente");
+Check(migrationScript.Contains("CREATE TABLE [FuelEntries]") && !migrationScript.Contains("DROP TABLE"), "Atualização aditiva sem apagar tabelas");
+Check(db.Database.GetMigrations().Count() == 2 && !db.Database.HasPendingModelChanges(), "Duas migrations e snapshot sincronizado");
+checks += await SqlIntegration.Run();
 Console.WriteLine($"{checks} verificações de regras e arquitetura passaram.");
 
 sealed class TestFleetStore : IFleetStore
@@ -79,5 +131,24 @@ sealed class TestFleetStore : IFleetStore
     {
         if (create) { d.Id = drivers.Count + 1; drivers.Add(d); }
         LastAudit = audit; Writes++; return Task.CompletedTask;
+    }
+}
+
+sealed class TestFuelStore : IFuelStore
+{
+    public List<FuelEntry> Entries { get; } = [];
+    public Audit? LastAudit { get; private set; }
+    public int Writes { get; private set; }
+    public Task<FuelEntry?> Request(int company, Guid requestId, CancellationToken ct) => Task.FromResult(Entries.SingleOrDefault(e => e.CompanyId == company && e.RequestId == requestId));
+    public Task<FuelPage> List(int company, FuelQuery query, CancellationToken ct) => Task.FromResult(new FuelPage([], 0, 0, 0));
+    public Task<FuelWindow> Window(int company, int vehicle, CancellationToken ct)
+    {
+        var entries = Entries.Where(e => e.CompanyId == company && e.VehicleId == vehicle).OrderBy(e => e.Id).ToList();
+        var full = entries.LastOrDefault(e => e.FullTank);
+        return Task.FromResult(new FuelWindow(entries.LastOrDefault()?.Date, full?.Odometer, full is null ? 0 : entries.Where(e => e.Id > full.Id).Sum(e => e.Liters)));
+    }
+    public Task Save(FuelEntry entry, Vehicle vehicle, byte[] version, Audit audit, CancellationToken ct)
+    {
+        entry.Id = Entries.Count + 1; Entries.Add(entry); Writes++; LastAudit = audit; return Task.CompletedTask;
     }
 }
