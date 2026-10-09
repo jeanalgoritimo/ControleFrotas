@@ -3,7 +3,12 @@ namespace ControleFrotas;
 
 public static class Validation
 {
-    public static string Plate(string? value) => (value ?? "").Trim().Replace("-", "").ToUpperInvariant();
+    public static string Plate(string? value)
+    {
+        var plate = (value ?? "").Trim().ToUpperInvariant();
+        // Only a single separator after the initial three letters is accepted.
+        return Regex.IsMatch(plate, @"^[A-Z]{3}-[0-9][A-Z0-9][0-9]{2}$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)) ? plate.Remove(3, 1) : plate;
+    }
     public static bool ValidPlate(string value) => Regex.IsMatch(value, @"^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     public static bool Digits(string? value, int count) => value is not null && value.Length == count && value.All(c => c is >= '0' and <= '9');
     public static bool ValidCpf(string? value)
@@ -21,7 +26,7 @@ public static class Validation
     }
     public static string? VehicleError(VehicleRequest r)
     {
-        if (!ValidPlate(Plate(r.Plate))) return "Informe uma placa brasileira válida.";
+        if (!ValidPlate(Plate(r.Plate))) return "Informe a placa no formato ABC1D23 (Mercosul) ou ABC-1234 (antiga).";
         if (!new[] { "Carro", "Moto", "Van", "Utilitário", "Caminhão", "Cavalo mecânico", "Implemento" }.Contains(r.Category)) return "Categoria inválida.";
         if (string.IsNullOrWhiteSpace(r.Brand) || r.Brand.Trim().Length > 80 || string.IsNullOrWhiteSpace(r.Model) || r.Model.Trim().Length > 100) return "Informe marca e modelo dentro dos limites.";
         if (r.Year < 1900 || r.Year > DateTime.UtcNow.Year + 1) return "Ano inválido.";
