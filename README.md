@@ -9,6 +9,7 @@ Aplicação Angular + ASP.NET Core .NET 10 + SQL Server para começar o controle
 - Placas antigas e Mercosul, CPF com dígitos verificadores, CNH com validação de formato (não consulta órgão emissor).
 - Aviso de CNH vencida, hodômetro com três casas decimais e exibição pt-BR.
 - Histórico de alterações e proteção contra edições concorrentes por rowversion.
+- Marcas e modelos com criação/edição em modal, inativação e seletores dependentes no veículo.
 - Abastecimentos em modal, totais em reais, filtros e consumo por intervalo entre tanques cheios.
 
 ## Pré-requisitos no Windows
@@ -52,8 +53,8 @@ As verificações de regras são um programa de testes sem dependência de SQL. 
 
 ## Roteiro inicial de teste
 1. Entrar com o administrador; senha errada deve ser rejeitada.
-2. Novo veículo: placa ABC1D23, categoria Carro, marca/modelo de teste, ano 2024, hodômetro 12000.125.
-3. Confirmar cadastro, pesquisar pela placa e editar o modelo.
+2. Em Marcas e modelos, cadastre uma marca e seus modelos. Novo veículo: placa ABC1D23, categoria Carro, selecione a marca/modelo de teste, ano 2024, hodômetro 12000.125.
+3. Confirmar cadastro, pesquisar pela placa e editar selecionando outro modelo da mesma marca.
 4. Tentar placa duplicada; API deve bloquear.
 5. Tentar reduzir o hodômetro; API deve bloquear.
 6. Desmarcar “Cadastro ativo” na edição; consultar removendo “Somente ativos”.
@@ -81,7 +82,7 @@ A solução segue a separação usada na Gestão de Estoque:
 
 Application depende de Domain; Infrastructure implementa IFleetStore da Application. API compõe os serviços. O frontend centraliza HTTP em core e contratos por funcionalidade em features. Login, visão geral, histórico e cadastros ficam em componentes por funcionalidade; App coordena sessão e carregamento.
 
-As rotas e os cadastros da v0.1 são preservados. InitialFleetBaseline cria um banco vazio ou valida/adota o esquema anterior; AddFuelEntries acrescenta a tabela operacional. O baseline não permite downgrade automático para evitar exclusão dos cadastros.
+As rotas e os cadastros da v0.1 são preservados. InitialFleetBaseline cria um banco vazio ou valida/adota o esquema anterior; AddFuelEntries acrescenta a tabela operacional e AddVehicleCatalog cria os cadastros relacionados e vincula os veículos existentes. O baseline não permite downgrade automático para evitar exclusão dos cadastros.
 
 Execute `dotnet build backend/ControleFrotas.slnx` para validar todos os projetos. O GitHub Actions verifica backend, regras e build Angular. Sonar não está configurado: não há declaração de aprovação no Sonar.
 
@@ -99,7 +100,7 @@ A listagem é paginada no servidor (20 registros), com filtros por veículo/per�
 
 ### Atualizar e testar
 
-Pare os dois servidores, atualize o código e inicie `scripts/iniciar-api.ps1`. A API aplica as duas migrations antes do login. Faça uma cópia de segurança do banco de avaliação antes da primeira atualização de esquema. Não apague o banco e não execute EnsureCreated ou scripts de criação manual.
+Pare os dois servidores, atualize o código e inicie `scripts/iniciar-api.ps1`. A API aplica as migrations pendentes antes do login. Faça uma cópia de segurança do banco de avaliação antes da primeira atualização de esquema. Não apague o banco e não execute EnsureCreated ou scripts de criação manual.
 
 1. Cadastre um veículo de teste com hodômetro 1000 km.
 2. Registre tanque cheio em 1000 km, 40 litros, preço 6,1234: total R$ 244,94 e consumo ainda sem referência completa.
@@ -114,3 +115,23 @@ GitHub Actions utiliza SQL Server 2022 em um container isolado, com credencial d
 Os testes de integração devem usar uma instância isolada com permissão para criar bancos. A connection string fornecida não é usada diretamente como banco de teste; cada cenário usa um novo banco aleatório. Não inclua credenciais reais no repositório.
 
 O pacote System.Security.Cryptography.Xml é fixado na versão 10.0.12 para atualizar a dependência transitiva de design das migrations, mantendo a auditoria NuGet ativa.
+
+## Marcas e modelos
+
+O menu **Marcas e modelos** tem os dois cadastros, com edição em modal, busca de marca e filtro de ativos. Selecione a marca para consultar os modelos dela. No veículo, os campos são seletores: trocar a marca limpa o modelo anterior e consulta `/api/vehicle-models?brandId=...` no servidor. O botão Salvar aguarda os dados e exige as duas seleções.
+
+Nomes de marcas têm até 80 caracteres e modelos até 100. Não é permitido repetir uma marca na mesma empresa nem um modelo na mesma marca, desconsiderando espaços nas extremidades e maiúsculas/minúsculas. Um modelo já cadastrado não muda de marca; cadastre outro modelo na marca correta. A API resolve os nomes pelos identificadores, valida marca/modelo/empresa e o banco também impõe esse vínculo por chave estrangeira composta.
+
+Inativação preserva veículos existentes. Cadastros inativos não podem ser usados em novas associações; editar um veículo sem trocar sua associação inativa continua permitido. Renomear a marca ou modelo atualiza os rótulos dos veículos vinculados na mesma transação com a auditoria. Isso altera a versão desses veículos: uma edição aberta anteriormente precisa atualizar os dados antes de salvar.
+
+Ao iniciar a API, a migration converte as marcas e modelos já preenchidos nos veículos em cadastros, agrupando pela empresa e marca. Os textos originais do veículo e o histórico são preservados. Se um veículo legado tiver marca ou modelo em branco, a atualização para com uma mensagem para corrigir esses registros; não apaga o banco.
+
+### Testar este cadastro
+
+1. Cadastre Toyota com modelos Corolla e Yaris, e Honda com Civic.
+2. Abra Novo veículo: ao selecionar Toyota, somente Corolla e Yaris devem aparecer.
+3. Selecione Corolla e troque para Honda: o modelo deve ser limpo e a lista deve apresentar Civic.
+4. Cadastre o veículo, abra Editar e confira as seleções salvas.
+5. Tente repetir ` toyota ` e `corolla` na mesma marca: deve haver bloqueio; o mesmo nome de modelo em outra marca é permitido.
+6. Renomeie uma marca/modelo e confira o veículo e a auditoria.
+7. Inative um modelo: ele deve sumir de novas seleções e continuar visível no veículo já vinculado.

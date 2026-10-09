@@ -8,6 +8,8 @@ public class Vehicle
     public string Category { get; set; } = "Carro";
     public string Brand { get; set; } = "";
     public string Model { get; set; } = "";
+    public int BrandId { get; set; }
+    public int ModelId { get; set; }
     public int Year { get; set; }
     public decimal Odometer { get; set; }
     public bool Active { get; set; } = true;

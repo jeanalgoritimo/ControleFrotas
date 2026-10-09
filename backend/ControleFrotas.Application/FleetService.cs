@@ -1,16 +1,23 @@
 namespace ControleFrotas;
 
-public sealed class FleetService(IFleetStore store)
+public sealed class FleetService(IFleetStore store, ICatalogStore catalog)
 {
     public Task<List<Vehicle>> Vehicles(int company, CancellationToken ct) => store.Vehicles(company, ct);
     public Task<List<Driver>> Drivers(int company, CancellationToken ct) => store.Drivers(company, ct);
     public Task<List<Audit>> Audits(int company, CancellationToken ct) => store.Audits(company, ct);
     public async Task<Vehicle> SaveVehicle(int company, string actor, int? id, VehicleRequest r, CancellationToken ct)
     {
-        if (Validation.VehicleError(r) is { } error) throw new BusinessException(error);
         var v = id.HasValue ? await store.Vehicle(company, id.Value, ct) ?? throw new RecordNotFoundException() : new Vehicle { CompanyId = company };
+        var brand = await catalog.Brand(company, r.BrandId, ct) ?? throw new BusinessException("Selecione uma marca cadastrada nesta empresa.");
+        var model = await catalog.Model(company, r.ModelId, ct) ?? throw new BusinessException("Selecione um modelo cadastrado nesta empresa.");
+        if (model.BrandId != brand.Id) throw new BusinessException("O modelo selecionado não pertence à marca informada.");
+        var unchanged = id.HasValue && v.BrandId == brand.Id && v.ModelId == model.Id;
+        if ((!brand.Active || !model.Active) && !unchanged) throw new BusinessException("Selecione uma marca e um modelo ativos.");
+        r = r with { Brand = brand.Name, Model = model.Name };
+        if (Validation.VehicleError(r) is { } error) throw new BusinessException(error);
         if (id.HasValue && r.Version is null) throw new BusinessException("Versão do registro obrigatória.");
         if (id.HasValue && r.Odometer < v.Odometer) throw new BusinessException("Hodômetro não pode diminuir nesta edição.");
+        v.BrandId = brand.Id; v.ModelId = model.Id;
         v.Plate = Validation.Plate(r.Plate); v.Category = r.Category; v.Brand = r.Brand.Trim(); v.Model = r.Model.Trim(); v.Year = r.Year; v.Odometer = r.Odometer; v.Active = r.Active;
         await store.SaveVehicle(v, r.Version, Log(company, actor, id.HasValue ? "Veículo editado" : "Veículo criado"), !id.HasValue, ct);
         return v;

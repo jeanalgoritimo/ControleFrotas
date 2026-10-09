@@ -7,6 +7,7 @@ import { Login } from "./app/features/auth/login";
 import { Overview } from "./app/features/overview/overview";
 import { FleetWorkspace } from "./app/features/fleet/fleet-workspace";
 import { AuditList } from "./app/features/audit/audit-list";
+import { CatalogWorkspace } from "./app/features/catalog/catalog-workspace";
 import { FuelWorkspace } from "./app/features/fuel/fuel-workspace";
 import { ApiClient, ApiError } from "./app/core/api-client";
 @Component({
@@ -20,6 +21,7 @@ import { ApiClient, ApiError } from "./app/core/api-client";
     AuditList,
     FleetWorkspace,
     FuelWorkspace,
+    CatalogWorkspace,
   ],
   templateUrl: "./app.html",
 })

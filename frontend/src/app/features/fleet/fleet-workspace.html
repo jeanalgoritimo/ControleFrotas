@@ -115,7 +115,11 @@
     </div>
   </footer>
 </section>
-<dialog #editor (cancel)="saving() ? $event.preventDefault() : null">
+<dialog
+  #editor
+  (close)="invalidateCatalog()"
+  (cancel)="saving() ? $event.preventDefault() : null"
+>
   <form (ngSubmit)="save()">
     <div class="modal-heading">
       <div>
@@ -164,27 +168,65 @@
         </select>
       </div>
       <div>
-        <label for="brand" class="form-label">Marca</label
-        ><input
+        <label for="brand" class="form-label">Marca</label>
+        <select
           id="brand"
-          name="brand"
-          class="form-control"
-          [(ngModel)]="vehicle.brand"
-          maxlength="80"
+          name="brandId"
+          class="form-select"
+          [ngModel]="vehicle.brandId"
+          (ngModelChange)="changeBrand($event)"
+          [disabled]="catalogLoading() || saving()"
           required
-        />
+        >
+          <option [ngValue]="0">
+            {{catalogLoading() ? 'Carregando marcas…' : 'Selecione uma marca'}}
+          </option>
+          @for (brand of brands(); track brand.id) {
+          <option [ngValue]="brand.id">
+            {{brand.name}}{{brand.active ? '' : ' (inativa)'}}
+          </option>
+          }
+        </select>
       </div>
       <div>
-        <label for="model" class="form-label">Modelo</label
-        ><input
+        <label for="model" class="form-label">Modelo</label>
+        <select
           id="model"
-          name="model"
-          class="form-control"
-          [(ngModel)]="vehicle.model"
-          maxlength="100"
+          name="modelId"
+          class="form-select"
+          [(ngModel)]="vehicle.modelId"
+          [disabled]="!vehicle.brandId || catalogLoading() || modelsLoading() || saving()"
           required
-        />
+        >
+          <option [ngValue]="0">
+            {{modelsLoading() ? 'Carregando modelos…' : vehicle.brandId ?
+            'Selecione um modelo' : 'Selecione a marca primeiro'}}
+          </option>
+          @for (model of models(); track model.id) {
+          <option [ngValue]="model.id">
+            {{model.name}}{{model.active ? '' : ' (inativo)'}}
+          </option>
+          }
+        </select>
       </div>
+      @if (catalogFailed()) {
+      <div class="full">
+        <button
+          type="button"
+          class="btn btn-outline-primary btn-sm"
+          (click)="loadCatalog()"
+          [disabled]="catalogLoading()"
+        >
+          Tentar carregar marcas e modelos novamente
+        </button>
+      </div>
+      } @if (!catalogLoading() && !modelsLoading() && !catalogFailed() &&
+      (!brands().length || (vehicle.brandId && !models().length))) {
+      <p class="full alert alert-info mb-0">
+        Cadastre a marca e seus modelos no menu
+        <strong>Marcas e modelos</strong> antes de salvar o veículo.
+      </p>
+      }
       <div>
         <label for="year" class="form-label">Ano de fabricação</label
         ><input
@@ -298,7 +340,10 @@
         [disabled]="saving()"
       >
         Cancelar</button
-      ><button class="btn btn-primary" [disabled]="saving()">
+      ><button
+        class="btn btn-primary"
+        [disabled]="saving() || (kind === 'vehicle' && (catalogLoading() || modelsLoading() || catalogFailed() || !vehicle.brandId || !vehicle.modelId))"
+      >
         {{saving() ? 'Salvando…' : 'Salvar'}}
       </button>
     </div>

@@ -4,6 +4,8 @@ export interface Vehicle {
   category: string;
   brand: string;
   model: string;
+  brandId: number;
+  modelId: number;
   year: number;
   odometer: number;
   active: boolean;

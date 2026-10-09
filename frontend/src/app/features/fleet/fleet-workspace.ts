@@ -11,6 +11,7 @@ import {
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
+import { VehicleBrand, VehicleModel } from "../catalog/catalog.models";
 import { Vehicle, Driver } from "./fleet.models";
 import { ApiClient } from "../../core/api-client";
 @Component({
@@ -29,6 +30,15 @@ export class FleetWorkspace {
   page = signal(1);
   modalError = signal("");
   saving = signal(false);
+  brands = signal<VehicleBrand[]>([]);
+  models = signal<VehicleModel[]>([]);
+  catalogLoading = signal(false);
+  modelsLoading = signal(false);
+  catalogFailed = signal(false);
+  private catalogSequence = 0;
+  private modelsSequence = 0;
+  private originalBrandId = 0;
+  private originalModelId = 0;
   kind = "vehicle";
   api = inject(ApiClient);
   vehicle = this.emptyVehicle();
@@ -69,6 +79,8 @@ export class FleetWorkspace {
       category: "Carro",
       brand: "",
       model: "",
+      brandId: 0,
+      modelId: 0,
       year: new Date().getFullYear(),
       odometer: 0,
       active: true,
@@ -90,7 +102,74 @@ export class FleetWorkspace {
   openVehicle(v?: Vehicle) {
     this.kind = "vehicle";
     this.vehicle = v ? { ...v } : this.emptyVehicle();
+    this.originalBrandId = v?.brandId ?? 0;
+    this.originalModelId = v?.modelId ?? 0;
+    this.brands.set([]);
+    this.models.set([]);
     this.showEditor();
+    void this.loadCatalog();
+  }
+  async loadCatalog() {
+    const sequence = ++this.catalogSequence;
+    this.catalogLoading.set(true);
+    this.catalogFailed.set(false);
+    this.modalError.set("");
+    try {
+      const brands = await this.api.request<VehicleBrand[]>(
+        "/vehicle-brands?includeInactive=true",
+      );
+      if (sequence !== this.catalogSequence) return;
+      this.brands.set(
+        brands.filter((b) => b.active || b.id === this.originalBrandId),
+      );
+      await this.loadModels(this.vehicle.brandId, this.vehicle.modelId);
+    } catch (e) {
+      if (sequence === this.catalogSequence) {
+        this.catalogFailed.set(true);
+        this.modalError.set(this.describe(e));
+      }
+    } finally {
+      if (sequence === this.catalogSequence) this.catalogLoading.set(false);
+    }
+  }
+  async changeBrand(brandId: number) {
+    this.vehicle.brandId = brandId;
+    this.vehicle.modelId = 0;
+    this.vehicle.model = "";
+    this.vehicle.brand =
+      this.brands().find((b) => b.id === brandId)?.name ?? "";
+    await this.loadModels(brandId, 0);
+  }
+  async loadModels(brandId: number, selectedModel: number) {
+    const sequence = ++this.modelsSequence;
+    this.models.set([]);
+    this.modelsLoading.set(brandId > 0);
+    this.catalogFailed.set(false);
+    if (!brandId) return;
+    try {
+      const models = await this.api.request<VehicleModel[]>(
+        `/vehicle-models?brandId=${brandId}&includeInactive=true`,
+      );
+      if (sequence !== this.modelsSequence) return;
+      this.models.set(
+        models.filter(
+          (m) =>
+            (m.active &&
+              !!this.brands().find((b) => b.id === brandId)?.active) ||
+            (brandId === this.originalBrandId && m.id === this.originalModelId),
+        ),
+      );
+      this.vehicle.modelId = this.models().some((m) => m.id === selectedModel)
+        ? selectedModel
+        : 0;
+    } catch (e) {
+      if (sequence === this.modelsSequence) {
+        this.catalogFailed.set(true);
+        this.modalError.set(this.describe(e));
+      }
+    } finally {
+      if (sequence === this.modelsSequence) this.modelsLoading.set(false);
+    }
   }
   openDriver(d?: Driver) {
     this.kind = "driver";
@@ -104,8 +183,23 @@ export class FleetWorkspace {
   closeEditor() {
     if (!this.saving()) this.editor.nativeElement.close();
   }
+  invalidateCatalog() {
+    ++this.catalogSequence;
+    ++this.modelsSequence;
+  }
   async save() {
     if (this.saving()) return;
+    if (
+      this.kind === "vehicle" &&
+      (!this.vehicle.brandId ||
+        !this.vehicle.modelId ||
+        this.catalogLoading() ||
+        this.modelsLoading() ||
+        this.catalogFailed())
+    ) {
+      this.modalError.set("Selecione uma marca e um modelo cadastrados.");
+      return;
+    }
     this.saving.set(true);
     this.modalError.set("");
     try {

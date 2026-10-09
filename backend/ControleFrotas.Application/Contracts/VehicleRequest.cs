@@ -1,3 +1,3 @@
 namespace ControleFrotas;
 
-public record VehicleRequest(string Plate, string Category, string Brand, string Model, int Year, decimal Odometer, bool Active, byte[]? Version);
+public record VehicleRequest(string Plate, string Category, string Brand, string Model, int Year, decimal Odometer, bool Active, byte[]? Version, int BrandId = 0, int ModelId = 0);

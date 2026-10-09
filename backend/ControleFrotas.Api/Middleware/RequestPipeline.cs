@@ -14,7 +14,7 @@ public static class RequestPipeline
             catch (BusinessException ex) { await Error(context, 400, ex.Message); }
             catch (RecordNotFoundException) { await Error(context, 404, "Registro não encontrado."); }
             catch (DbUpdateConcurrencyException) { await Error(context, 409, "Registro alterado por outra sessão. Atualize e tente novamente."); }
-            catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 }) { await Error(context, 409, "Não foi possível gravar. Verifique duplicidade de placa ou CPF."); }
+            catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 }) { await Error(context, 409, "Não foi possível gravar. Verifique duplicidade de placa, CPF, marca ou modelo."); }
             catch (AntiforgeryValidationException) { await Error(context, 400, "Sessão de formulário inválida. Recarregue a página."); }
             catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { }
             catch (Exception ex)
