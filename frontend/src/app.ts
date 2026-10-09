@@ -7,6 +7,7 @@ import { Login } from "./app/features/auth/login";
 import { Overview } from "./app/features/overview/overview";
 import { FleetWorkspace } from "./app/features/fleet/fleet-workspace";
 import { AuditList } from "./app/features/audit/audit-list";
+import { FuelWorkspace } from "./app/features/fuel/fuel-workspace";
 import { ApiClient, ApiError } from "./app/core/api-client";
 @Component({
   selector: "app-root",
@@ -18,10 +19,12 @@ import { ApiClient, ApiError } from "./app/core/api-client";
     Overview,
     AuditList,
     FleetWorkspace,
+    FuelWorkspace,
   ],
   templateUrl: "./app.html",
 })
 export class App {
+  fuelRefresh = signal(0);
   user = signal("");
   loading = signal(false);
   message = signal("");
@@ -118,6 +121,7 @@ export class App {
       this.vehicles.set(vehicles);
       this.drivers.set(drivers);
       this.audits.set(audits);
+      this.fuelRefresh.update((value) => value + 1);
     } catch (e) {
       this.error.set(this.describe(e));
     } finally {

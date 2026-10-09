@@ -1,12 +1,11 @@
-# Verificação da refatoração
+# Verificação da entrega de abastecimentos
 
-- Solução com quatro projetos .NET 10: build sem erros ou avisos.
-- Frontend Angular: build de produção concluído.
-- Verificações executáveis cobrem placas, CPF, CNH, precisão, categorias, isolamento por empresa, edição, inativação e dependências das camadas.
-- O esquema SQL gerado foi comparado integralmente com o modelo original da v0.1, incluindo índices, tamanhos, precisão e rowversion.
-- Persistência, transações e autenticação precisam ser verificadas contra SQL Server real no Windows. A comparação de esquema não substitui teste de atualização em banco real.
+- Build Release da solução e das verificações .NET 10 sem erros ou avisos.
+- 71 verificações locais de regras, arquitetura, consumo, idempotência e estrutura de migrations aprovadas.
+- Build Angular de produção e Prettier executados.
+- As quatro tabelas originais foram comparadas com o esquema SQL da v0.1. O snapshot está sincronizado; as migrations de atualização não removem tabelas.
+- Testes de SQL Server real foram acrescentados ao CI. A execução local foi explicitamente omitida por ausência de FLEET_TEST_SQL. Consulte o resultado do workflow para confirmar os testes remotos.
 - Não houve inspeção visual em navegador nesta entrega.
-- GitHub Actions foi adicionado. O resultado remoto deve ser consultado no PR.
-- Sonar não foi executado nem configurado; não há aprovação Sonar nesta entrega.
+- Sonar não foi configurado nem executado.
 
-Não apague o banco. Pare API/frontend, atualize o código e execute novamente o script e npm start. Migrations permanecem uma etapa futura com baseline explícito.
+A API passou de EnsureCreated para Migrate. O baseline valida/adota o banco antigo, sem recriar cadastros; esquemas incompatíveis interrompem a atualização. Faça backup antes da primeira atualização de esquema. Não apague o banco.

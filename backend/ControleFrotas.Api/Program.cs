@@ -6,5 +6,6 @@ await app.InitializeFleetDatabase();
 app.UseFleetPipeline();
 app.MapAuthEndpoints();
 app.MapFleetEndpoints();
+app.MapFuelEndpoints();
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 app.Run();

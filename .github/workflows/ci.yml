@@ -7,6 +7,17 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "Fleet-CI-Only-123456!"
+        ports:
+          - 1433:1433
+    env:
+      FLEET_TEST_SQL: "Server=localhost,1433;User ID=sa;Password=Fleet-CI-Only-123456!;Encrypt=True;TrustServerCertificate=True;Connect Timeout=3"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
